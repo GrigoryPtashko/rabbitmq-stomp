@@ -327,15 +327,29 @@ frame_transformer(_) -> fun(Frame) -> Frame end.
 report_missing_id_header(State) ->
     error("Missing Header",
           "Header 'id' is required for durable subscriptions", State).
+report_wrong_destination(State) ->
+    error("Wrong destination", "No user id prefix or no destination at all", State).
 
-validate_frame(Command, Frame, State)
+validate_frame(
+  Command, Frame,
+  State = #proc_state{config = #stomp_configuration{user_id = UserId}})
+
   when Command =:= "SUBSCRIBE" orelse Command =:= "UNSUBSCRIBE" ->
     Hdr = fun(Name) -> rabbit_stomp_frame:header(Frame, Name) end,
-    case {Hdr(?HEADER_DURABLE), Hdr(?HEADER_PERSISTENT), Hdr(?HEADER_ID)} of
-        {{ok, "true"}, _, not_found} ->
+    case {Hdr(?HEADER_DURABLE), Hdr(?HEADER_PERSISTENT),
+          Hdr(?HEADER_ID), Hdr(?HEADER_DESTINATION)} of
+        {{ok, "true"}, _, not_found, _} ->
             report_missing_id_header(State);
-        {_, {ok, "true"}, not_found} ->
+        {_, {ok, "true"}, not_found, _} ->
             report_missing_id_header(State);
+        {_, _, _, not_found} ->
+            report_wrong_destination(State);
+        {_, _, _, {ok, Destination}} ->
+            case string:str(
+                   Destination, "/topic/" ++ integer_to_list(UserId) ++ ".") of
+              0 -> report_wrong_destination(State);
+              _ -> ok(State)
+            end;
         _ ->
             ok(State)
     end;

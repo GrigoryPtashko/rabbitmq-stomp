@@ -18,7 +18,8 @@
                               default_passcode,
                               force_default_creds = false,
                               implicit_connect,
-                              ssl_cert_login}).
+                              ssl_cert_login,
+                              user_id}).
 
 -define(SUPPORTED_VERSIONS, ["1.0", "1.1", "1.2"]).
 
